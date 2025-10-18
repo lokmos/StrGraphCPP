@@ -85,6 +85,14 @@ std::unordered_map<std::string, int> Executor::compute_in_degrees() const {
 
 std::vector<Node*> Executor::topological_sort() {
     auto in_degree = compute_in_degrees();
+    std::unordered_map<std::string, std::vector<std::string>> dependents;
+    
+    for (auto& [id, node] : graph_.get_nodes()) {
+        for (const auto& input_id : node.input_ids) {
+            dependents[input_id].push_back(id);
+        }
+    }
+    
     std::queue<Node*> zero_degree_queue;
     std::vector<Node*> sorted;
     
@@ -99,15 +107,12 @@ std::vector<Node*> Executor::topological_sort() {
         zero_degree_queue.pop();
         sorted.push_back(current);
         
-        for (auto& [id, node] : graph_.get_nodes()) {
-            int count = std::count(node.input_ids.begin(), 
-                                  node.input_ids.end(), 
-                                  current->id);
-            
-            if (count > 0) {
-                in_degree[id] -= count;
-                if (in_degree[id] == 0) {
-                    zero_degree_queue.push(&node);
+        auto it = dependents.find(current->id);
+        if (it != dependents.end()) {
+            for (const auto& dependent_id : it->second) {
+                in_degree[dependent_id]--;
+                if (in_degree[dependent_id] == 0) {
+                    zero_degree_queue.push(&graph_.get_node(dependent_id));
                 }
             }
         }
@@ -139,13 +144,16 @@ std::vector<Node*> Executor::topological_sort_subgraph(std::string_view target_n
     mark_reachable(std::string(target_node_id));
     
     std::unordered_map<std::string, int> in_degree;
+    std::unordered_map<std::string, std::vector<std::string>> dependents;
     
     for (const auto& id : reachable) {
         Node& node = graph_.get_node(id);
         in_degree[id] = 0;
+        
         for (const auto& input_id : node.input_ids) {
             if (reachable.contains(input_id)) {
                 in_degree[id]++;
+                dependents[input_id].push_back(id);
             }
         }
     }
@@ -164,16 +172,12 @@ std::vector<Node*> Executor::topological_sort_subgraph(std::string_view target_n
         zero_degree_queue.pop();
         sorted.push_back(current);
         
-        for (const auto& id : reachable) {
-            Node& node = graph_.get_node(id);
-            int count = std::count(node.input_ids.begin(), 
-                                  node.input_ids.end(), 
-                                  current->id);
-            
-            if (count > 0) {
-                in_degree[id] -= count;
-                if (in_degree[id] == 0) {
-                    zero_degree_queue.push(&node);
+        auto it = dependents.find(current->id);
+        if (it != dependents.end()) {
+            for (const auto& dependent_id : it->second) {
+                in_degree[dependent_id]--;
+                if (in_degree[dependent_id] == 0) {
+                    zero_degree_queue.push(&graph_.get_node(dependent_id));
                 }
             }
         }
