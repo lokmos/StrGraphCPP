@@ -2,7 +2,6 @@
 #include "strgraph/operation_registry.h"
 #include <format>
 #include <stdexcept>
-#include <algorithm>
 #include <functional>
 #include <queue>
 
@@ -237,6 +236,74 @@ const std::string& Executor::compute_iterative(std::string_view target_node_id) 
         execute_node(*node);
     }
     
+    Node& target = graph_.get_node(target_node_id);
+    if (!target.computed_result.has_value()) {
+        throw std::runtime_error(
+            std::format("Target node '{}' has no computed result", target_node_id));
+    }
+    
+    return target.computed_result.value();
+}
+
+std::vector<std::vector<Node*>> Executor::partition_by_layers(
+    const std::vector<Node*>& sorted_nodes) const {
+
+    std::unordered_map<std::string, int> node_level;
+    std::vector<std::vector<Node*>> layers;
+
+    for (Node* node : sorted_nodes) {
+        int max_input_level = 0;
+
+        for (const auto& input_id : node->input_ids) {
+            auto it = node_level.find(input_id);
+            if (it != node_level.end()) {
+                max_input_level = std::max(max_input_level, it->second);
+            }
+        }
+
+        int current_level = max_input_level + 1;
+        node_level[node->id] = current_level;
+
+        if (layers.size() <= static_cast<size_t>(current_level)) {
+            layers.resize(current_level + 1);
+        }
+
+        layers[current_level].push_back(node);
+    }
+
+    return layers;
+}
+
+void Executor::execute_layer(const std::vector<Node*>& layer) {
+    if (layer.size() >= MIN_PARALLEL_LAYER_SIZE) {
+#ifdef USE_OPENMP
+        // OpenMP available: parallel execution
+        #pragma omp parallel for schedule(dynamic)
+        for (size_t i = 0; i < layer.size(); ++i) {
+            execute_node(*layer[i]);
+        }
+#else
+        // OpenMP not available: fall back to sequential execution
+        for (Node* node : layer) {
+            execute_node(*node);
+        }
+#endif
+    } else {
+        // Layer too small: sequential execution to avoid overhead
+        for (Node* node : layer) {
+            execute_node(*node);
+        }
+    }
+}
+
+const std::string& Executor::compute_parallel(std::string_view target_node_id) {
+    auto sorted_nodes = topological_sort_subgraph(target_node_id);
+    auto layers = partition_by_layers(sorted_nodes);
+
+    for (const auto& layer : layers) {
+        execute_layer(layer);
+    }
+
     Node& target = graph_.get_node(target_node_id);
     if (!target.computed_result.has_value()) {
         throw std::runtime_error(

@@ -9,6 +9,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3")
 
+# Find OpenMP
+find_package(OpenMP)
+
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
@@ -24,6 +27,16 @@ set(SOURCES
 
 # Create library
 add_library(strgraph STATIC ${SOURCES})
+
+# Link OpenMP to library
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(strgraph PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(strgraph PUBLIC USE_OPENMP)
+    message(STATUS "OpenMP found and enabled - parallel execution available")
+else()
+    message(WARNING "OpenMP not found - parallel execution will fall back to sequential")
+    message(STATUS "Library will still work correctly, just without parallelization")
+endif()
 
 # Find Google Test
 find_package(GTest REQUIRED)

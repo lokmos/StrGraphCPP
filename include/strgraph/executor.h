@@ -43,12 +43,43 @@ public:
     [[nodiscard]] const std::string& compute_iterative(std::string_view target_node_id);
 
     /**
+     * @brief Compute the result using layer-wise parallel execution.
+     * 
+     * This method uses topological sorting to partition nodes into layers,
+     * then executes each layer in parallel (if OpenMP is available).
+     * 
+     * Behavior:
+     * - If USE_OPENMP is defined and layer has >= MIN_PARALLEL_LAYER_SIZE nodes:
+     *   executes layer in parallel using OpenMP
+     * - Otherwise: falls back to sequential execution (no performance penalty)
+     * 
+     * This method is safe to use even without OpenMP - it will automatically
+     * degrade to sequential execution while maintaining correctness.
+     * 
+     * @param target_node_id ID of the node to compute
+     * @return Const reference to the computed result string
+     * @throws std::runtime_error if cycles are detected or node not found
+     * 
+     * @note Performance characteristics:
+     * - Best for wide graphs (many nodes per layer)
+     * - Automatically skips parallelization for small layers
+     * - No performance penalty for narrow/deep graphs
+     */
+    [[nodiscard]] const std::string& compute_parallel(std::string_view target_node_id);
+
+    /**
      * @brief Perform topological sort on the graph.
      * 
      * @return Vector of nodes in topological order
      * @throws std::runtime_error if cycle is detected
      */
     [[nodiscard]] std::vector<Node*> topological_sort();
+
+    /**
+     * @brief Minimum size of a layer to be executed in parallel.
+     * 
+     */
+    static constexpr size_t MIN_PARALLEL_LAYER_SIZE = 200;
 
 private:
     /**
@@ -101,6 +132,22 @@ private:
      * @return Vector of nodes in topological order (only reachable nodes)
      */
     [[nodiscard]] std::vector<Node*> topological_sort_subgraph(std::string_view target_node_id);
+
+    /**
+     * @brief Partition the sorted nodes into layers.
+     * 
+     * @param sorted_nodes Vector of nodes in topological order
+     * @return Vector of vectors of nodes, each representing a layer
+     */
+    [[nodiscard]] std::vector<std::vector<Node*>> partition_by_layers(
+        const std::vector<Node*>& sorted_nodes) const;
+    
+    /**
+     * @brief Execute a layer of nodes.
+     * 
+     * @param layer Vector of nodes to execute
+     */
+    void execute_layer(const std::vector<Node*>& layer);
 };
 
 }

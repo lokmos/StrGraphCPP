@@ -701,6 +701,108 @@ TEST_F(StrGraphTest, TopologicalSort_BasicOrder) {
 }
 
 // ============================================================================
+// PARALLEL EXECUTION TEST
+// ============================================================================
+
+TEST_F(StrGraphTest, Parallel_ComplexOperations_Performance) {
+    const int NUM_NODES = 500;
+    const int NUM_RUNS = 3;
+    
+    std::cout << "\n=== Parallel Complex Operations Test ===\n";
+    std::cout << "Configuration:\n";
+    std::cout << "  - " << NUM_NODES << " nodes with complex string operations\n";
+    std::cout << "  - Operations: reverse → to_upper → to_lower (chained)\n";
+    std::cout << "  - Input strings: 100+ characters each\n";
+    
+    json::array_t nodes;
+    
+    std::string base_string = "The quick brown fox jumps over the lazy dog. "
+                              "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+                              "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+    
+    for (int i = 0; i < NUM_NODES; ++i) {
+        std::string input_id = "input_" + std::to_string(i);
+        std::string rev_id = "rev_" + std::to_string(i);
+        std::string upper_id = "upper_" + std::to_string(i);
+        std::string lower_id = "lower_" + std::to_string(i);
+        
+        nodes.push_back({{"id", input_id}, {"value", base_string + std::to_string(i)}});
+        nodes.push_back({{"id", rev_id}, {"op", "reverse"}, {"inputs", json::array({input_id})}});
+        nodes.push_back({{"id", upper_id}, {"op", "to_upper"}, {"inputs", json::array({rev_id})}});
+        nodes.push_back({{"id", lower_id}, {"op", "to_lower"}, {"inputs", json::array({upper_id})}});
+    }
+    
+    json::array_t final_inputs;
+    for (int i = 0; i < NUM_NODES; ++i) {
+        final_inputs.push_back("lower_" + std::to_string(i));
+    }
+    
+    nodes.push_back({
+        {"id", "final"},
+        {"op", "concat"},
+        {"inputs", final_inputs}
+    });
+    
+    nlohmann::json graph_json = {
+        {"nodes", nodes},
+        {"target_node", "final"}
+    };
+    
+    std::cout << "\nTotal nodes in graph: " << nodes.size() << "\n";
+    std::cout << "Running " << NUM_RUNS << " iterations...\n\n";
+    
+    double iter_total = 0.0;
+    double par_total = 0.0;
+    
+    for (int run = 0; run < NUM_RUNS; ++run) {
+        auto g1 = Graph::from_json(graph_json);
+        Executor exec1(*g1);
+        PerformanceTimer timer1;
+        [[maybe_unused]] auto result1 = exec1.compute_iterative("final");
+        double iter_time = timer1.elapsed_ms();
+        iter_total += iter_time;
+        
+        auto g2 = Graph::from_json(graph_json);
+        Executor exec2(*g2);
+        PerformanceTimer timer2;
+        [[maybe_unused]] auto result2 = exec2.compute_parallel("final");
+        double par_time = timer2.elapsed_ms();
+        par_total += par_time;
+        
+        std::cout << "Run " << (run + 1) << ": ";
+        std::cout << "Iter=" << iter_time << "ms, ";
+        std::cout << "Par=" << par_time << "ms, ";
+        std::cout << "Speedup=" << (iter_time / par_time) << "x\n";
+        
+        EXPECT_EQ(result1, result2);
+    }
+    
+    double iter_avg = iter_total / NUM_RUNS;
+    double par_avg = par_total / NUM_RUNS;
+    
+    std::cout << "\n--- Results ---\n";
+    std::cout << "Iterative (avg): " << iter_avg << " ms\n";
+    std::cout << "Parallel (avg):  " << par_avg << " ms\n";
+    std::cout << "Speedup: " << (iter_avg / par_avg) << "x\n";
+    
+#ifdef USE_OPENMP
+    std::cout << "\nOpenMP: ENABLED\n";
+    std::cout << "Parallel threshold: " << Executor::MIN_PARALLEL_LAYER_SIZE << " nodes/layer\n";
+    std::cout << "Expected: Each layer has " << NUM_NODES << " nodes → should parallelize\n";
+    
+    if (par_avg < iter_avg) {
+        std::cout << "✓ Parallel execution provided " << ((iter_avg / par_avg - 1.0) * 100) 
+                  << "% speedup\n";
+    } else {
+        std::cout << "Note: Overhead still dominates for this workload\n";
+    }
+#else
+    std::cout << "\nOpenMP: DISABLED\n";
+    std::cout << "Expected: Similar performance (no parallelization)\n";
+#endif
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 
