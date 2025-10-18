@@ -40,6 +40,13 @@ public:
      */
     const NodeMap& get_nodes() const;
 
+    /**
+     * @brief Get mutable reference to all nodes.
+     * 
+     * @return Mutable reference to the node map
+     */
+    NodeMap& get_nodes();
+
 private:
     NodeMap nodes_;
 };

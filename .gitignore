@@ -37,3 +37,6 @@ Thumbs.db
 # Test outputs
 *.log
 
+# Documentation (work in progress)
+ROADMAP.md
+
