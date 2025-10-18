@@ -43,4 +43,8 @@ const Graph::NodeMap& Graph::get_nodes() const {
     return nodes_;
 }
 
+Graph::NodeMap& Graph::get_nodes() {
+    return nodes_;
+}
+
 } // namespace strgraph
