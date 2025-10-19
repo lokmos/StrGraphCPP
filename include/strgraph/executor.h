@@ -114,6 +114,13 @@ private:
     std::unordered_set<std::string> visiting_;
     
     /**
+     * @brief Feed dictionary for PLACEHOLDER nodes.
+     * 
+     * Stores runtime values for PLACEHOLDER nodes during execution.
+     */
+    FeedDict feed_dict_;
+    
+    /**
      * @brief Recursively compute a node and all its dependencies.
      * 
      * @param node The node to compute

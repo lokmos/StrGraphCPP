@@ -37,7 +37,6 @@ std::unique_ptr<Graph> Graph::from_json(const nlohmann::json& json_data) {
             if (!node_json.contains("type")) {
                 node.type = NodeType::CONSTANT;
             }
-            node.op_name = std::string(IDENTITY_OP);
             node.initial_value = node_json.at("value").get<std::string>();
         } else if (node_json.contains("op")) {
             // Has operation: OPERATION
@@ -57,9 +56,7 @@ std::unique_ptr<Graph> Graph::from_json(const nlohmann::json& json_data) {
                 throw std::runtime_error(std::format(
                     "Node '{}' has neither 'value' nor 'op', and no 'type' specified", node.id));
             }
-            if (node.type == NodeType::PLACEHOLDER) {
-                node.op_name = std::string(IDENTITY_OP);
-            } else {
+            if (node.type != NodeType::PLACEHOLDER) {
                 throw std::runtime_error(std::format(
                     "Node '{}' of type '{}' requires 'value' or 'op'", 
                     node.id, node_json.at("type").get<std::string>()));

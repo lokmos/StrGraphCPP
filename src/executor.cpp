@@ -75,7 +75,9 @@ namespace strgraph {
 Executor::Executor(Graph& graph) : graph_(graph) {}
 
 const std::string& Executor::compute(std::string_view target_node_id, const FeedDict& feed_dict) {
-
+    // Save feed_dict for use during execution
+    feed_dict_ = feed_dict;
+    
     prepare_graph(feed_dict);
     
     visiting_.clear(); // Reset for new computation
@@ -129,15 +131,34 @@ void Executor::compute_node_recursive(Node& node) {
 
     visiting_.insert(node.id);
 
-    // Handle identity nodes (source nodes with initial values)
-    if (node.op_name == IDENTITY_OP) {
-        if (!node.initial_value.has_value()) {
-            throw std::runtime_error(std::format("Identity node '{}' missing initial_value", node.id));
-        }
-        node.computed_result = node.initial_value.value();
-        node.state = NodeState::COMPUTED;
-        visiting_.erase(node.id);
-        return;
+    // Handle node types that don't require computation
+    switch (node.type) {
+        case NodeType::CONSTANT:
+        case NodeType::VARIABLE:
+            // Should already be initialized in prepare_graph
+            if (!node.computed_result.has_value()) {
+                throw std::runtime_error(std::format("Node '{}' has no computed result", node.id));
+            }
+            visiting_.erase(node.id);
+            return;
+            
+        case NodeType::PLACEHOLDER:
+            // Get value from feed_dict
+            {
+                auto it = feed_dict_.find(node.id);
+                if (it == feed_dict_.end()) {
+                    throw std::runtime_error(
+                        std::format("PLACEHOLDER node '{}' missing from feed_dict", node.id));
+                }
+                node.computed_result = it->second;
+                node.state = NodeState::COMPUTED;
+                visiting_.erase(node.id);
+                return;
+            }
+            
+        case NodeType::OPERATION:
+            // Continue to operation execution below
+            break;
     }
 
     // Compute all input dependencies
@@ -340,14 +361,32 @@ void Executor::execute_node(Node& node) {
         return;
     }
     
-    if (node.op_name == IDENTITY_OP) {
-        if (!node.initial_value.has_value()) {
-            throw std::runtime_error(
-                std::format("Identity node '{}' missing initial_value", node.id));
-        }
-        node.computed_result = node.initial_value;
-        node.state = NodeState::COMPUTED;
-        return;
+    // Handle node types that don't require operation execution
+    switch (node.type) {
+        case NodeType::CONSTANT:
+        case NodeType::VARIABLE:
+            // Should already be initialized in prepare_graph
+            if (!node.computed_result.has_value()) {
+                throw std::runtime_error(std::format("Node '{}' has no computed result", node.id));
+            }
+            return;
+            
+        case NodeType::PLACEHOLDER:
+            // Get value from feed_dict
+            {
+                auto it = feed_dict_.find(node.id);
+                if (it == feed_dict_.end()) {
+                    throw std::runtime_error(
+                        std::format("PLACEHOLDER node '{}' missing from feed_dict", node.id));
+                }
+                node.computed_result = it->second;
+                node.state = NodeState::COMPUTED;
+                return;
+            }
+            
+        case NodeType::OPERATION:
+            // Continue to operation execution below
+            break;
     }
     
     std::vector<std::string_view> input_values;
@@ -408,6 +447,9 @@ void Executor::execute_node(Node& node) {
 }
 
 const std::string& Executor::compute_iterative(std::string_view target_node_id, const FeedDict& feed_dict) {
+    // Save feed_dict for use during execution
+    feed_dict_ = feed_dict;
+    
     // Prepare graph for execution (reset state, apply feed_dict)
     prepare_graph(feed_dict);
     
@@ -507,7 +549,9 @@ void Executor::execute_layer(const std::vector<Node*>& layer) {
 }
 
 const std::string& Executor::compute_parallel(std::string_view target_node_id, const FeedDict& feed_dict) {
-
+    // Save feed_dict for use during execution
+    feed_dict_ = feed_dict;
+    
     prepare_graph(feed_dict);
     
     auto sorted_nodes = topological_sort_subgraph(target_node_id);
@@ -571,16 +615,8 @@ void Executor::prepare_graph(const FeedDict& feed_dict) {
                 break;
 
             case NodeType::PLACEHOLDER:
-                // PLACEHOLDER nodes get their value from feed_dict
-                {
-                    auto it = feed_dict.find(node.id);
-                    if (it == feed_dict.end()) {
-                        throw std::runtime_error(
-                            std::format("PLACEHOLDER node '{}' missing from feed_dict", node.id));
-                    }
-                    node.computed_result = it->second;
-                    node.state = NodeState::COMPUTED;
-                }
+                // PLACEHOLDER nodes will get their value from feed_dict when computed
+                // Don't validate here - only check when actually needed during execution
                 break;
 
             case NodeType::VARIABLE:

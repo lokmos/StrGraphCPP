@@ -146,7 +146,8 @@ class Graph:
         Returns:
             A Node object representing the operation
         """
-        node_id = self._generate_node_id(name or op_name)
+        # Auto-generate unique ID if name is not provided
+        node_id = self._generate_node_id(name)
         node_dict = {
             "id": node_id,
             "op": op_name,

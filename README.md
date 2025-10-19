@@ -5,28 +5,18 @@ A high-performance string computation graph system with C++ backend and Python f
 ## ⚡ Quick Start
 
 ```bash
-# Step 1: Extract the archive
-tar -xzf StrGraphCPP.tar.gz
-cd StrGraphCPP
+# Extract the archive (all dependencies included)
+tar -xzf StrGraphCPP.tar.gz && cd StrGraphCPP
 
-# Step 2: Install dependencies (pybind11)
-mkdir -p third_party
-cd third_party
-git clone https://github.com/pybind/pybind11.git
-cd ..
+# Build the project
+mkdir build && cd build && cmake .. && make -j$(nproc) && cd ..
 
-# Step 3: Build
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
-
-# Step 4: Setup Python environment
-cd ..
+# Set up Python path and test
 export PYTHONPATH=$PWD:$PYTHONPATH
-
-# Step 5: Verify
-python3 -c "import strgraph; print(strgraph.__version__)"
+python3 -c "import strgraph; print('StrGraph version:', strgraph.__version__)"
 ```
+
+See [Installation](#installation) section for detailed steps.
 
 ---
 
@@ -57,8 +47,6 @@ StrGraphCPP is a string computation graph system that allows users to define str
 ---
 
 ## Key Features
-
-### ✅ Implemented Features
 
 1. **High-Performance C++ Backend**
    - Three execution engines: recursive, iterative topological sort, parallel execution
@@ -109,13 +97,19 @@ StrGraphCPP is a string computation graph system that allows users to define str
 ### Optional Dependencies
 
 - **OpenMP**: For parallel execution (highly recommended)
-- **Google Test**: Included in third_party (auto-download)
-- **nlohmann/json**: Included in third_party
-- **pybind11**: Needs manual download (see installation steps)
+
+### Included Dependencies
+
+All third-party libraries are included in the archive:
+- **pybind11**: Python C++ binding library
+- **nlohmann/json**: JSON parsing library
+- **Google Test**: Unit testing framework (auto-downloaded by CMake)
 
 ---
 
 ## Installation
+
+> **Note**: This archive contains all required dependencies (including pybind11 and nlohmann/json). No additional downloads needed!
 
 ### Step 1: Extract Archive
 
@@ -124,19 +118,11 @@ tar -xzf StrGraphCPP.tar.gz
 cd StrGraphCPP
 ```
 
-### Step 2: Get pybind11
+Verify that the following directories exist:
+- `third_party/pybind11/`: Python binding library
+- `third_party/json.hpp`: JSON parsing library
 
-```bash
-# Create third_party directory
-mkdir -p third_party
-
-# Clone pybind11
-cd third_party
-git clone https://github.com/pybind/pybind11.git
-cd ..
-```
-
-### Step 3: Build C++ Library
+### Step 2: Build C++ Library
 
 ```bash
 # Create build directory
@@ -155,7 +141,7 @@ make -j$(nproc)
 - `strgraph_test`: C++ unit test executable
 - `strgraph_cpp.cpython-*.so`: Python module (in `build/` directory)
 
-### Step 4: Verify Build
+### Step 3: Verify Build
 
 ```bash
 # Run C++ tests
@@ -166,7 +152,7 @@ make -j$(nproc)
 # [  PASSED  ] 48 tests.
 ```
 
-### Step 5: Configure Python Environment
+### Step 4: Configure Python Environment
 
 Two ways to use the Python frontend:
 
@@ -178,7 +164,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 
 # Verify
 python3 -c "import strgraph; print(strgraph.__version__)"
-# Output: 0.6.0
+# Output: 0.7.0
 ```
 
 **Recommendation**: Add this command to `~/.bashrc`
@@ -200,9 +186,10 @@ python3 -c "import site; print(site.getsitepackages()[0])" | \
 xargs -I {} ln -sf $PWD/build/strgraph_cpp*.so {}/
 ```
 
-### Step 6: Verify Python Module
+### Step 5: Verify Python Module
 
 ```bash
+# Test the Python frontend (optional - requires test files)
 cd python
 python3 test_frontend.py
 
@@ -211,6 +198,8 @@ python3 test_frontend.py
 # Results: 8 passed, 0 failed
 # ============================================================
 ```
+
+> **Note**: Test files are not included in the distribution archive. Users can write their own tests or examples based on the API documentation below.
 
 ---
 

@@ -52,7 +52,7 @@ from .custom_ops import (
 from .backend import is_backend_available
 
 # Version info
-__version__ = "0.5.0"
+__version__ = "0.7.0"
 
 # Public API
 __all__ = [

@@ -1,4 +1,4 @@
-# Build directories
+# Build directories and outputs
 build/
 cmake-build-*/
 
@@ -8,13 +8,14 @@ cmake-build-*/
 *.a
 *.so
 *.dylib
+*.dll
 
 # Executables
 *.exe
 *.out
 strgraph_test
 
-# CMake
+# CMake generated files
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
@@ -22,7 +23,7 @@ Makefile
 *.cmake
 !CMakeLists.txt
 
-# IDE
+# IDE configurations
 .vscode/
 .idea/
 .clangd
@@ -30,31 +31,32 @@ Makefile
 *.swo
 *~
 
-# OS
+# OS specific
 .DS_Store
 Thumbs.db
+
+# Development records (local only)
+Record.md
+
+# Test files (local development only)
+tests/
+python/test_frontend.py
+python/comprehensive_test.py
+
+# Example files (users can write their own)
+examples/
 
 # Test outputs
 *.log
 
-# Internal documentation (not for distribution)
-Record.md
-USAGE.md
-ROADMAP.md
-INSTALL.md
-*.md
-!README.md
-
-# Examples
-examples/
-
-# Third party libraries
-third_party/
-
-# Python
+# Python build artifacts
 __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
 dist/
 *.egg
+
+# All markdown except README
+*.md
+!README.md

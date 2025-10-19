@@ -15,8 +15,11 @@ using strgraph::OpResult;
 
 namespace {
 
-OpResult identity_op(std::span<const std::string_view>, std::span<const std::string_view>) {
-    return std::string{};
+OpResult identity_op(std::span<const std::string_view> inputs, std::span<const std::string_view>) {
+    if (inputs.size() != 1) {
+        throw std::runtime_error("identity operation requires exactly 1 input");
+    }
+    return std::string{inputs[0]};
 }
 
 OpResult reverse_op(std::span<const std::string_view> inputs, std::span<const std::string_view> constants) {
