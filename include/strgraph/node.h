@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include "operation_registry.h"
 
 namespace strgraph {
 
@@ -57,9 +58,15 @@ struct Node {
     NodeState state = NodeState::PENDING;
     
     /**
-     * @brief The computed result value (only valid when state is COMPUTED).
+     * @brief The computed result value.
+     * 
+     * Can hold either:
+     * - std::string for single-output operations (e.g., reverse, concat)
+     * - std::vector<std::string> for multi-output operations (e.g., split)
+     * 
+     * std::nullopt when the node has not been computed yet.
      */
-    std::optional<std::string> computed_result;
+    std::optional<OpResult> computed_result;
 };
 
 }
