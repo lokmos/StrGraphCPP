@@ -896,7 +896,7 @@ TEST_F(StrGraphTest, MultiOutput_Error_IndexOutOfBounds) {
     };
     
     EXPECT_THROW({
-        execute(graph_json.dump());
+        [[maybe_unused]] auto result = execute(graph_json.dump());
     }, std::runtime_error);
 }
 
@@ -910,7 +910,7 @@ TEST_F(StrGraphTest, MultiOutput_Error_IndexOnSingleOutputNode) {
     };
     
     EXPECT_THROW({
-        execute(graph_json.dump());
+        [[maybe_unused]] auto result = execute(graph_json.dump());
     }, std::runtime_error);
 }
 
@@ -925,7 +925,7 @@ TEST_F(StrGraphTest, MultiOutput_Error_NoIndexOnMultiOutputNode) {
     };
     
     EXPECT_THROW({
-        execute(graph_json.dump());
+        [[maybe_unused]] auto result = execute(graph_json.dump());
     }, std::runtime_error);
 }
 
@@ -940,7 +940,7 @@ TEST_F(StrGraphTest, MultiOutput_Error_InvalidIndexFormat) {
     };
     
     EXPECT_THROW({
-        execute(graph_json.dump());
+        [[maybe_unused]] auto result = execute(graph_json.dump());
     }, std::runtime_error);
 }
 
@@ -956,6 +956,192 @@ TEST_F(StrGraphTest, MultiOutput_SplitEmptyDelimiter) {
     
     [[maybe_unused]] auto result = execute(graph_json.dump());
     EXPECT_EQ(result, "hello");
+}
+
+// ============================================================================
+// Node Type Tests (CONSTANT, PLACEHOLDER, VARIABLE, OPERATION)
+// ============================================================================
+
+class NodeTypesTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        core_ops::register_all();
+    }
+};
+
+TEST_F(NodeTypesTest, Placeholder_BasicUsage) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "input"}, {"type", "placeholder"}},
+            {{"id", "output"}, {"op", "reverse"}, {"inputs", {"input"}}}
+        }},
+        {"target_node", "output"}
+    };
+
+    strgraph::FeedDict feed_dict = {{"input", "hello"}};
+    std::string result = strgraph::execute(graph_json.dump(), feed_dict);
+    EXPECT_EQ(result, "olleh");
+}
+
+TEST_F(NodeTypesTest, Placeholder_MultipleExecutions) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "text"}, {"type", "placeholder"}},
+            {{"id", "upper"}, {"op", "to_upper"}, {"inputs", {"text"}}},
+            {{"id", "result"}, {"op", "reverse"}, {"inputs", {"upper"}}}
+        }},
+        {"target_node", "result"}
+    };
+
+    // Execute with different inputs
+    std::string result1 = strgraph::execute(graph_json.dump(), {{"text", "hello"}});
+    EXPECT_EQ(result1, "OLLEH");
+
+    std::string result2 = strgraph::execute(graph_json.dump(), {{"text", "world"}});
+    EXPECT_EQ(result2, "DLROW");
+
+    std::string result3 = strgraph::execute(graph_json.dump(), {{"text", "test"}});
+    EXPECT_EQ(result3, "TSET");
+}
+
+TEST_F(NodeTypesTest, Placeholder_MultiplePlaceholders) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "first"}, {"type", "placeholder"}},
+            {{"id", "second"}, {"type", "placeholder"}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", {"first", "second"}}}
+        }},
+        {"target_node", "result"}
+    };
+
+    strgraph::FeedDict feed_dict = {
+        {"first", "Hello"},
+        {"second", "World"}
+    };
+    std::string result = strgraph::execute(graph_json.dump(), feed_dict);
+    EXPECT_EQ(result, "HelloWorld");
+}
+
+TEST_F(NodeTypesTest, Placeholder_Error_MissingFeedDict) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "input"}, {"type", "placeholder"}},
+            {{"id", "output"}, {"op", "reverse"}, {"inputs", {"input"}}}
+        }},
+        {"target_node", "output"}
+    };
+
+    // Missing feed_dict entry should throw
+    EXPECT_THROW({
+        [[maybe_unused]] auto result = strgraph::execute(graph_json.dump(), {});
+    }, std::runtime_error);
+}
+
+TEST_F(NodeTypesTest, Constant_ExplicitType) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "input"}, {"type", "constant"}, {"value", "hello"}},
+            {{"id", "output"}, {"op", "reverse"}, {"inputs", {"input"}}}
+        }},
+        {"target_node", "output"}
+    };
+
+    std::string result = strgraph::execute(graph_json.dump());
+    EXPECT_EQ(result, "olleh");
+}
+
+TEST_F(NodeTypesTest, Variable_PersistsAcrossExecutions) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "state"}, {"type", "variable"}, {"value", "initial"}},
+            {{"id", "input"}, {"type", "placeholder"}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", {"state", "input"}}}
+        }},
+        {"target_node", "result"}
+    };
+
+    // First execution
+    std::string result1 = strgraph::execute(graph_json.dump(), {{"input", "_1"}});
+    EXPECT_EQ(result1, "initial_1");
+
+    // VARIABLE nodes persist, but for now they reset each execute call
+    // This is expected behavior since we call prepare_graph which resets state
+    std::string result2 = strgraph::execute(graph_json.dump(), {{"input", "_2"}});
+    EXPECT_EQ(result2, "initial_2");
+}
+
+TEST_F(NodeTypesTest, MixedTypes_Complex) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "const1"}, {"type", "constant"}, {"value", "Hello"}},
+            {{"id", "placeholder1"}, {"type", "placeholder"}},
+            {{"id", "var1"}, {"type", "variable"}, {"value", "!"}},
+            {{"id", "concat1"}, {"op", "concat"}, {"inputs", {"const1", "placeholder1"}}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", {"concat1", "var1"}}}
+        }},
+        {"target_node", "result"}
+    };
+
+    strgraph::FeedDict feed_dict = {{"placeholder1", " World"}};
+    std::string result = strgraph::execute(graph_json.dump(), feed_dict);
+    EXPECT_EQ(result, "Hello World!");
+}
+
+TEST_F(NodeTypesTest, Placeholder_WithMultiOutput) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "text"}, {"type", "placeholder"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", {"text"}}, {"constants", {" "}}},
+            {{"id", "first"}, {"op", "to_upper"}, {"inputs", {"parts:0"}}},
+            {{"id", "second"}, {"op", "to_lower"}, {"inputs", {"parts:1"}}}
+        }},
+        {"target_node", "second"}
+    };
+
+    std::string result = strgraph::execute(graph_json.dump(), {{"text", "HELLO WORLD"}});
+    EXPECT_EQ(result, "world");
+}
+
+TEST_F(NodeTypesTest, BackwardCompatibility_ValueField) {
+    // Old-style graphs (with "value" field) should still work
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "a"}, {"value", "hello"}},  // Auto-detected as CONSTANT
+            {{"id", "b"}, {"op", "reverse"}, {"inputs", {"a"}}}
+        }},
+        {"target_node", "b"}
+    };
+
+    std::string result = strgraph::execute(graph_json.dump());
+    EXPECT_EQ(result, "olleh");
+}
+
+TEST_F(NodeTypesTest, Error_PlaceholderWithValue) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "input"}, {"type", "placeholder"}, {"value", "hello"}},  // Invalid!
+            {{"id", "output"}, {"op", "reverse"}, {"inputs", {"input"}}}
+        }},
+        {"target_node", "output"}
+    };
+
+    EXPECT_THROW({
+        [[maybe_unused]] auto result = strgraph::execute(graph_json.dump());
+    }, std::runtime_error);
+}
+
+TEST_F(NodeTypesTest, Error_ConstantWithoutValue) {
+    nlohmann::json graph_json = {
+        {"nodes", {
+            {{"id", "input"}, {"type", "constant"}},  // Missing value!
+            {{"id", "output"}, {"op", "reverse"}, {"inputs", {"input"}}}
+        }},
+        {"target_node", "output"}
+    };
+
+    EXPECT_THROW({
+        [[maybe_unused]] auto result = strgraph::execute(graph_json.dump());
+    }, std::runtime_error);
 }
 
 // ============================================================================

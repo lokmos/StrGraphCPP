@@ -8,6 +8,13 @@
 namespace strgraph {
 
 /**
+ * @brief Type alias for runtime input dictionary.
+ * 
+ * Maps node IDs to their runtime values (for PLACEHOLDER nodes).
+ */
+using FeedDict = std::unordered_map<std::string, std::string>;
+
+/**
  * @brief Executor for computing nodes in a string computation graph.
  */
 class Executor {
@@ -26,21 +33,28 @@ public:
      * computing the target itself. Results are cached in the nodes.
      * 
      * @param target_node_id ID of the node to compute
+     * @param feed_dict Runtime values for PLACEHOLDER nodes
      * @return Const reference to the computed result string
      * @throws std::runtime_error if cycles are detected or node not found
      * @throws std::runtime_error if any node computation fails
+     * @throws std::runtime_error if PLACEHOLDER node missing from feed_dict
      */
-    [[nodiscard]] const std::string& compute(std::string_view target_node_id);
+    [[nodiscard]] const std::string& compute(
+        std::string_view target_node_id,
+        const FeedDict& feed_dict = {});
 
     /**
      * @brief Compute the result using iterative topological sort.
      * 
      * @param target_node_id ID of the node to compute
+     * @param feed_dict Runtime values for PLACEHOLDER nodes
      * @return Const reference to the computed result string
      * @throws std::runtime_error if cycles are detected or node not found
+     * @throws std::runtime_error if PLACEHOLDER node missing from feed_dict
      */
-
-    [[nodiscard]] const std::string& compute_iterative(std::string_view target_node_id);
+    [[nodiscard]] const std::string& compute_iterative(
+        std::string_view target_node_id,
+        const FeedDict& feed_dict = {});
 
     /**
      * @brief Compute the result using layer-wise parallel execution.
@@ -57,15 +71,19 @@ public:
      * degrade to sequential execution while maintaining correctness.
      * 
      * @param target_node_id ID of the node to compute
+     * @param feed_dict Runtime values for PLACEHOLDER nodes
      * @return Const reference to the computed result string
      * @throws std::runtime_error if cycles are detected or node not found
+     * @throws std::runtime_error if PLACEHOLDER node missing from feed_dict
      * 
      * @note Performance characteristics:
      * - Best for wide graphs (many nodes per layer)
      * - Automatically skips parallelization for small layers
      * - No performance penalty for narrow/deep graphs
      */
-    [[nodiscard]] const std::string& compute_parallel(std::string_view target_node_id);
+    [[nodiscard]] const std::string& compute_parallel(
+        std::string_view target_node_id,
+        const FeedDict& feed_dict = {});
 
     /**
      * @brief Perform topological sort on the graph.
@@ -148,6 +166,18 @@ private:
      * @param layer Vector of nodes to execute
      */
     void execute_layer(const std::vector<Node*>& layer);
+
+    /**
+     * @brief Prepare graph for execution with feed_dict.
+     * 
+     * - Resets all non-VARIABLE nodes to PENDING state
+     * - Initializes PLACEHOLDER nodes with feed_dict values
+     * - Initializes CONSTANT and VARIABLE nodes with their initial values
+     * 
+     * @param feed_dict Runtime values for PLACEHOLDER nodes
+     * @throws std::runtime_error if required PLACEHOLDER is missing from feed_dict
+     */
+    void prepare_graph(const FeedDict& feed_dict);
 };
 
 }

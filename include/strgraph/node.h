@@ -12,6 +12,22 @@ namespace strgraph {
 inline constexpr std::string_view IDENTITY_OP = "identity";
 
 /**
+ * @brief Enumeration representing the type of a node.
+ * 
+ * This classification aligns with PyTorch's node system:
+ * - CONSTANT: Like PyTorch leaf tensors with fixed values
+ * - PLACEHOLDER: Like PyTorch input tensors (runtime binding)
+ * - VARIABLE: Like PyTorch variables (mutable state between executions)
+ * - OPERATION: Like PyTorch computational nodes (e.g., AddBackward)
+ */
+enum class NodeType {
+    CONSTANT,      
+    PLACEHOLDER,   
+    VARIABLE,      
+    OPERATION      
+};
+
+/**
  * @brief Enumeration representing the computation state of a node.
  */
 enum class NodeState { 
@@ -33,12 +49,27 @@ struct Node {
     std::string id;
     
     /**
-     * @brief Name of the operation to apply.
+     * @brief Type of this node.
+     * 
+     * Determines how the node is initialized and executed:
+     * - CONSTANT: initialized with initial_value at graph creation
+     * - PLACEHOLDER: value must be provided in feed_dict at execution
+     * - VARIABLE: like CONSTANT but result persists between executions
+     * - OPERATION: computed from inputs via op_name
+     */
+    NodeType type = NodeType::OPERATION;
+    
+    /**
+     * @brief Name of the operation to apply (for OPERATION nodes).
+     * 
+     * For CONSTANT/PLACEHOLDER/VARIABLE nodes, this defaults to "identity".
      */
     std::string op_name;
     
     /**
      * @brief IDs of input nodes whose results feed into this node's operation.
+     * 
+     * Can include output index syntax (e.g., "node:0" for multi-output nodes).
      */
     std::vector<std::string> input_ids;
     
@@ -48,7 +79,12 @@ struct Node {
     std::vector<std::string> constants;
     
     /**
-     * @brief Optional initial value for the node (if it's a source node).
+     * @brief Initial value for CONSTANT or VARIABLE nodes.
+     * 
+     * - CONSTANT: Required, defines the fixed value
+     * - VARIABLE: Optional, defines the initial state (can be updated later)
+     * - PLACEHOLDER: Not used (value comes from feed_dict)
+     * - OPERATION: Not used (value computed from inputs)
      */
     std::optional<std::string> initial_value;
     
@@ -64,7 +100,8 @@ struct Node {
      * - std::string for single-output operations (e.g., reverse, concat)
      * - std::vector<std::string> for multi-output operations (e.g., split)
      * 
-     * std::nullopt when the node has not been computed yet.
+     * For VARIABLE nodes, this persists between executions.
+     * For other nodes, it's reset at the start of each execution.
      */
     std::optional<OpResult> computed_result;
 };

@@ -7,6 +7,11 @@
 namespace strgraph {
 
 std::string execute(std::string_view json_data) {
+    return execute(json_data, {});
+}
+
+std::string execute(std::string_view json_data, 
+                   const std::unordered_map<std::string, std::string>& feed_dict) {
     auto json = nlohmann::json::parse(json_data);
 
     if (!json.contains("target_node")) {
@@ -18,7 +23,7 @@ std::string execute(std::string_view json_data) {
     auto graph = Graph::from_json(json);
     Executor executor(*graph);
 
-    return executor.compute(target_node_id);
+    return executor.compute(target_node_id, feed_dict);
 }
 
 } // namespace strgraph
