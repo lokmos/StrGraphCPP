@@ -4,6 +4,8 @@
 #include <span>
 #include <functional>
 #include <unordered_map>
+#include <variant>
+#include <vector>
 
 namespace strgraph {
 
@@ -34,16 +36,24 @@ struct StringEqual {
 
 
 /**
+ * @brief Result type for string operations.
+ * 
+ * Operations can return either a single string (single-output) or
+ * a vector of strings (multi-output).
+ */
+using OpResult = std::variant<std::string, std::vector<std::string>>;
+
+/**
  * @brief Type alias for string operations that take inputs and constants.
  * 
  * A StringOperation is a callable that processes a collection of input strings
- * and constant strings to produce a single output string.
+ * and constant strings to produce either a single output string or multiple output strings.
  * 
  * @param inputs A span of string_view representing dynamic input values
  * @param constants A span of string_view representing constant values
- * @return The computed result string
+ * @return OpResult - either std::string for single output or std::vector<std::string> for multi-output
  */
-using StringOperation = std::function<std::string(
+using StringOperation = std::function<OpResult(
     std::span<const std::string_view> inputs,
     std::span<const std::string_view> constants
 )>;

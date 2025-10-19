@@ -803,6 +803,162 @@ TEST_F(StrGraphTest, Parallel_ComplexOperations_Performance) {
 }
 
 // ============================================================================
+// MULTI-OUTPUT OPERATIONS TESTS
+// ============================================================================
+
+TEST_F(StrGraphTest, MultiOutput_BasicSplit) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "apple,banana,cherry"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}}
+        })},
+        {"target_node", "parts:0"}
+    };
+    
+    [[maybe_unused]] auto result1 = execute(graph_json.dump());
+    EXPECT_EQ(result1, "apple");
+    
+    graph_json["target_node"] = "parts:1";
+    [[maybe_unused]] auto result2 = execute(graph_json.dump());
+    EXPECT_EQ(result2, "banana");
+    
+    graph_json["target_node"] = "parts:2";
+    [[maybe_unused]] auto result3 = execute(graph_json.dump());
+    EXPECT_EQ(result3, "cherry");
+}
+
+TEST_F(StrGraphTest, MultiOutput_SplitWithSpaceDelimiter) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "sentence"}, {"value", "The quick brown fox"}},
+            {{"id", "words"}, {"op", "split"}, {"inputs", json::array({"sentence"})}, {"constants", json::array({" "})}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", json::array({"words:0", "words:3"})}, {"constants", json::array({" ... "})}}
+        })},
+        {"target_node", "result"}
+    };
+    
+    [[maybe_unused]] auto result = execute(graph_json.dump());
+    EXPECT_EQ(result, "Thefox ... ");
+}
+
+TEST_F(StrGraphTest, MultiOutput_CombineMultipleOutputs) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "a,b,c,d"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", json::array({"parts:0", "parts:2", "parts:3"})}}
+        })},
+        {"target_node", "result"}
+    };
+    
+    [[maybe_unused]] auto result = execute(graph_json.dump());
+    EXPECT_EQ(result, "acd");
+}
+
+TEST_F(StrGraphTest, MultiOutput_ChainOperations) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "hello,world"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}},
+            {{"id", "upper1"}, {"op", "to_upper"}, {"inputs", json::array({"parts:0"})}},
+            {{"id", "upper2"}, {"op", "to_upper"}, {"inputs", json::array({"parts:1"})}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", json::array({"upper1", "upper2"})}}
+        })},
+        {"target_node", "result"}
+    };
+    
+    [[maybe_unused]] auto result = execute(graph_json.dump());
+    EXPECT_EQ(result, "HELLOWORLD");
+}
+
+TEST_F(StrGraphTest, MultiOutput_DirectTargetWithIndex) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "one,two,three"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}}
+        })},
+        {"target_node", "parts:1"}
+    };
+    
+    [[maybe_unused]] auto result = execute(graph_json.dump());
+    EXPECT_EQ(result, "two");
+}
+
+// Error handling tests
+TEST_F(StrGraphTest, MultiOutput_Error_IndexOutOfBounds) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "a,b"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}},
+            {{"id", "invalid"}, {"op", "identity"}, {"inputs", json::array({"parts:10"})}}
+        })},
+        {"target_node", "invalid"}
+    };
+    
+    EXPECT_THROW({
+        execute(graph_json.dump());
+    }, std::runtime_error);
+}
+
+TEST_F(StrGraphTest, MultiOutput_Error_IndexOnSingleOutputNode) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "hello"}},
+            {{"id", "invalid"}, {"op", "identity"}, {"inputs", json::array({"text:0"})}}
+        })},
+        {"target_node", "invalid"}
+    };
+    
+    EXPECT_THROW({
+        execute(graph_json.dump());
+    }, std::runtime_error);
+}
+
+TEST_F(StrGraphTest, MultiOutput_Error_NoIndexOnMultiOutputNode) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "a,b,c"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}},
+            {{"id", "invalid"}, {"op", "identity"}, {"inputs", json::array({"parts"})}}
+        })},
+        {"target_node", "invalid"}
+    };
+    
+    EXPECT_THROW({
+        execute(graph_json.dump());
+    }, std::runtime_error);
+}
+
+TEST_F(StrGraphTest, MultiOutput_Error_InvalidIndexFormat) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "a,b,c"}},
+            {{"id", "parts"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({","})}},
+            {{"id", "invalid"}, {"op", "identity"}, {"inputs", json::array({"parts:abc"})}}
+        })},
+        {"target_node", "invalid"}
+    };
+    
+    EXPECT_THROW({
+        execute(graph_json.dump());
+    }, std::runtime_error);
+}
+
+TEST_F(StrGraphTest, MultiOutput_SplitEmptyDelimiter) {
+    nlohmann::json graph_json = {
+        {"nodes", json::array({
+            {{"id", "text"}, {"value", "hello"}},
+            {{"id", "chars"}, {"op", "split"}, {"inputs", json::array({"text"})}, {"constants", json::array({""})}},
+            {{"id", "result"}, {"op", "concat"}, {"inputs", json::array({"chars:0", "chars:1", "chars:2", "chars:3", "chars:4"})}}
+        })},
+        {"target_node", "result"}
+    };
+    
+    [[maybe_unused]] auto result = execute(graph_json.dump());
+    EXPECT_EQ(result, "hello");
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 
