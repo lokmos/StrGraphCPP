@@ -37,14 +37,15 @@ Thumbs.db
 # Test outputs
 *.log
 
-# Documentation (work in progress)
-ROADMAP.md
-Record.md
-USAGE.md
-PYTHON_CUSTOM_OPS_DESIGN.md
+# Documentation
+*.md
+!README.md
+
+# Examples
+examples/
 
 # Third party libraries
-third_party/pybind11/
+third_party/
 
 # Python
 __pycache__/
@@ -53,4 +54,3 @@ __pycache__/
 *.egg-info/
 dist/
 *.egg
-
