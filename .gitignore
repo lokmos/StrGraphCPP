@@ -37,7 +37,11 @@ Thumbs.db
 # Test outputs
 *.log
 
-# Documentation
+# Internal documentation (not for distribution)
+Record.md
+USAGE.md
+ROADMAP.md
+INSTALL.md
 *.md
 !README.md
 
