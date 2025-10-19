@@ -74,7 +74,10 @@ namespace strgraph {
 
 Executor::Executor(Graph& graph) : graph_(graph) {}
 
-const std::string& Executor::compute(std::string_view target_node_id) {
+const std::string& Executor::compute(std::string_view target_node_id, const FeedDict& feed_dict) {
+
+    prepare_graph(feed_dict);
+    
     visiting_.clear(); // Reset for new computation
     
     // Support "node:index" syntax for accessing multi-output nodes
@@ -404,7 +407,10 @@ void Executor::execute_node(Node& node) {
     node.state = NodeState::COMPUTED;
 }
 
-const std::string& Executor::compute_iterative(std::string_view target_node_id) {
+const std::string& Executor::compute_iterative(std::string_view target_node_id, const FeedDict& feed_dict) {
+    // Prepare graph for execution (reset state, apply feed_dict)
+    prepare_graph(feed_dict);
+    
     auto sorted = topological_sort_subgraph(target_node_id);
     
     for (Node* node : sorted) {
@@ -500,7 +506,10 @@ void Executor::execute_layer(const std::vector<Node*>& layer) {
     }
 }
 
-const std::string& Executor::compute_parallel(std::string_view target_node_id) {
+const std::string& Executor::compute_parallel(std::string_view target_node_id, const FeedDict& feed_dict) {
+
+    prepare_graph(feed_dict);
+    
     auto sorted_nodes = topological_sort_subgraph(target_node_id);
     auto layers = partition_by_layers(sorted_nodes);
 
@@ -541,6 +550,53 @@ const std::string& Executor::compute_parallel(std::string_view target_node_id) {
             return result[index];
         }
     }, *target.computed_result);
+}
+
+void Executor::prepare_graph(const FeedDict& feed_dict) {
+    for (auto& [node_id, node] : graph_.get_nodes()) {
+        // Reset non-VARIABLE nodes
+        if (node.type != NodeType::VARIABLE) {
+            node.state = NodeState::PENDING;
+            node.computed_result.reset();
+        }
+
+        // Initialize nodes based on type
+        switch (node.type) {
+            case NodeType::CONSTANT:
+                // CONSTANT nodes use their initial_value
+                if (node.initial_value.has_value()) {
+                    node.computed_result = *node.initial_value;
+                    node.state = NodeState::COMPUTED;
+                }
+                break;
+
+            case NodeType::PLACEHOLDER:
+                // PLACEHOLDER nodes get their value from feed_dict
+                {
+                    auto it = feed_dict.find(node.id);
+                    if (it == feed_dict.end()) {
+                        throw std::runtime_error(
+                            std::format("PLACEHOLDER node '{}' missing from feed_dict", node.id));
+                    }
+                    node.computed_result = it->second;
+                    node.state = NodeState::COMPUTED;
+                }
+                break;
+
+            case NodeType::VARIABLE:
+                // VARIABLE nodes persist their result between executions
+                // Only initialize if not yet computed
+                if (!node.computed_result.has_value() && node.initial_value.has_value()) {
+                    node.computed_result = *node.initial_value;
+                    node.state = NodeState::COMPUTED;
+                }
+                break;
+
+            case NodeType::OPERATION:
+                // OPERATION nodes will be computed during execution
+                break;
+        }
+    }
 }
 
 }

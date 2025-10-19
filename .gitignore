@@ -41,4 +41,16 @@ Thumbs.db
 ROADMAP.md
 Record.md
 USAGE.md
+PYTHON_CUSTOM_OPS_DESIGN.md
+
+# Third party libraries
+third_party/pybind11/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+*.egg
 

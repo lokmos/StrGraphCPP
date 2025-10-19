@@ -9,6 +9,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3")
 
+# Suppress false positive warnings from std::variant in GCC 14
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized")
+endif()
+
 # Find OpenMP
 find_package(OpenMP)
 
@@ -58,4 +63,49 @@ add_test(NAME strgraph_test COMMAND strgraph_test)
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+
+# ============================================================================
+# Python Bindings (Optional)
+# ============================================================================
+
+option(BUILD_PYTHON_BINDINGS "Build Python bindings with pybind11" ON)
+
+if(BUILD_PYTHON_BINDINGS)
+    # Find Python
+    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+    message(STATUS "Python3 found: ${Python3_EXECUTABLE}")
+    message(STATUS "Python3 version: ${Python3_VERSION}")
+    message(STATUS "Python3 include: ${Python3_INCLUDE_DIRS}")
+    
+    # Add pybind11 subdirectory
+    add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/pybind11)
+    
+    # Create Python module
+    pybind11_add_module(strgraph_cpp
+        src/python_bindings.cpp
+        ${SOURCES}  # Include all source files
+    )
+    
+    # Include directories for Python module
+    target_include_directories(strgraph_cpp PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/third_party
+    )
+    
+    # Link OpenMP if available
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(strgraph_cpp PRIVATE OpenMP::OpenMP_CXX)
+        target_compile_definitions(strgraph_cpp PRIVATE USE_OPENMP)
+    endif()
+    
+    # Set output properties - pybind11 handles the suffix automatically
+    set_target_properties(strgraph_cpp PROPERTIES
+        PREFIX "${PYTHON_MODULE_PREFIX}"
+        SUFFIX "${PYTHON_MODULE_EXTENSION}"
+    )
+    
+    message(STATUS "Python bindings enabled - module: strgraph_cpp")
+else()
+    message(STATUS "Python bindings disabled")
+endif()
 
