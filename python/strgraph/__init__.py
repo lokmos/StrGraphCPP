@@ -5,21 +5,6 @@ This is the main Python frontend for StrGraphCPP, providing a user-friendly
 API for building and executing string computation graphs backed by a C++
 execution engine.
 
-Basic Usage:
-    >>> import strgraph as sg
-    >>> 
-    >>> # Create a graph
-    >>> g = sg.Graph()
-    >>> 
-    >>> # Define computation
-    >>> text = g.placeholder("text")
-    >>> result = sg.reverse(sg.to_upper(text))
-    >>> 
-    >>> # Execute with different inputs
-    >>> output = g.run(result, {"text": "hello"})
-    >>> print(output)
-    'OLLEH'
-
 The library is organized into several modules:
 - graph: Core Graph and Node classes
 - ops: String operation functions
@@ -31,12 +16,22 @@ from .graph import Graph, Node, MultiOutputNode
 
 # Operations
 from .ops import (
+    # Basic operations
     reverse,
     to_upper,
     to_lower,
     concat,
     split,
     identity,
+    # String manipulation operations
+    trim,
+    replace,
+    substring,
+    repeat,
+    pad_left,
+    pad_right,
+    capitalize,
+    title,
 )
 
 # Custom operations
@@ -61,13 +56,23 @@ __all__ = [
     "Node",
     "MultiOutputNode",
     
-    # Operations
+    # Basic operations
     "reverse",
     "to_upper",
     "to_lower",
     "concat",
     "split",
     "identity",
+    
+    # String manipulation operations
+    "trim",
+    "replace",
+    "substring",
+    "repeat",
+    "pad_left",
+    "pad_right",
+    "capitalize",
+    "title",
     
     # Custom operations
     "register_operation",

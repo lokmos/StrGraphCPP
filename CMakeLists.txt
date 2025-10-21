@@ -55,6 +55,10 @@ target_link_libraries(strgraph_test
     pthread
 )
 
+# Benchmark executable
+add_executable(strgraph_benchmark tests/benchmark.cpp)
+target_link_libraries(strgraph_benchmark strgraph)
+
 # Enable testing
 enable_testing()
 add_test(NAME strgraph_test COMMAND strgraph_test)

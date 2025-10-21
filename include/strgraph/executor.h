@@ -22,22 +22,37 @@ public:
     /**
      * @brief Construct an Executor for the given graph.
      * 
-     * @param graph The computation graph containing nodes to execute
+     * @param graph The computation graph
      */
     explicit Executor(Graph& graph);
 
+    /**
+     * @brief Automatically select and execute the best strategy.
+     * 
+     * Analyzes graph characteristics and chooses optimal execution method:
+     * - Recursive: depth <= 100 && nodes <= 500 (fastest for small graphs)
+     * - Parallel: OpenMP available && width >= 100 && nodes >= 500
+     * - Iterative: default for large/deep graphs
+     * 
+     * @param target_node_id ID of the node to compute
+     * @param feed_dict Runtime values for PLACEHOLDER nodes
+     * @return Const reference to the computed result string
+     */
+    [[nodiscard]] const std::string& compute_auto(
+        std::string_view target_node_id,
+        const FeedDict& feed_dict = {});
+    
     /**
      * @brief Compute the result of a target node (recursive version).
      * 
      * Recursively computes all dependencies of the target node before
      * computing the target itself. Results are cached in the nodes.
      * 
+     * Best for: Small shallow graphs (depth <= 100, nodes <= 500)
+     * 
      * @param target_node_id ID of the node to compute
      * @param feed_dict Runtime values for PLACEHOLDER nodes
      * @return Const reference to the computed result string
-     * @throws std::runtime_error if cycles are detected or node not found
-     * @throws std::runtime_error if any node computation fails
-     * @throws std::runtime_error if PLACEHOLDER node missing from feed_dict
      */
     [[nodiscard]] const std::string& compute(
         std::string_view target_node_id,
@@ -49,8 +64,6 @@ public:
      * @param target_node_id ID of the node to compute
      * @param feed_dict Runtime values for PLACEHOLDER nodes
      * @return Const reference to the computed result string
-     * @throws std::runtime_error if cycles are detected or node not found
-     * @throws std::runtime_error if PLACEHOLDER node missing from feed_dict
      */
     [[nodiscard]] const std::string& compute_iterative(
         std::string_view target_node_id,
@@ -59,27 +72,9 @@ public:
     /**
      * @brief Compute the result using layer-wise parallel execution.
      * 
-     * This method uses topological sorting to partition nodes into layers,
-     * then executes each layer in parallel (if OpenMP is available).
-     * 
-     * Behavior:
-     * - If USE_OPENMP is defined and layer has >= MIN_PARALLEL_LAYER_SIZE nodes:
-     *   executes layer in parallel using OpenMP
-     * - Otherwise: falls back to sequential execution (no performance penalty)
-     * 
-     * This method is safe to use even without OpenMP - it will automatically
-     * degrade to sequential execution while maintaining correctness.
-     * 
      * @param target_node_id ID of the node to compute
      * @param feed_dict Runtime values for PLACEHOLDER nodes
      * @return Const reference to the computed result string
-     * @throws std::runtime_error if cycles are detected or node not found
-     * @throws std::runtime_error if PLACEHOLDER node missing from feed_dict
-     * 
-     * @note Performance characteristics:
-     * - Best for wide graphs (many nodes per layer)
-     * - Automatically skips parallelization for small layers
-     * - No performance penalty for narrow/deep graphs
      */
     [[nodiscard]] const std::string& compute_parallel(
         std::string_view target_node_id,
@@ -89,7 +84,6 @@ public:
      * @brief Perform topological sort on the graph.
      * 
      * @return Vector of nodes in topological order
-     * @throws std::runtime_error if cycle is detected
      */
     [[nodiscard]] std::vector<Node*> topological_sort();
 
@@ -124,15 +118,11 @@ private:
      * @brief Recursively compute a node and all its dependencies.
      * 
      * @param node The node to compute
-     * @throws std::runtime_error if a cycle is detected
-     * @throws std::runtime_error if operation execution fails
      */
     void compute_node_recursive(Node& node);
 
     /**
      * @brief Compute in-degree for all nodes.
-     * 
-     * In-degree = number of nodes that depend on this node
      * 
      * @return Map of node_id -> in_degree
      */
@@ -144,7 +134,6 @@ private:
      * Assumes all dependencies have been computed.
      * 
      * @param node The node to execute
-     * @throws std::runtime_error if execution fails
      */
     void execute_node(Node& node);
 
@@ -175,16 +164,50 @@ private:
     void execute_layer(const std::vector<Node*>& layer);
 
     /**
-     * @brief Prepare graph for execution with feed_dict.
+     * @brief Prepare graph for execution.
      * 
      * - Resets all non-VARIABLE nodes to PENDING state
-     * - Initializes PLACEHOLDER nodes with feed_dict values
      * - Initializes CONSTANT and VARIABLE nodes with their initial values
-     * 
-     * @param feed_dict Runtime values for PLACEHOLDER nodes
-     * @throws std::runtime_error if required PLACEHOLDER is missing from feed_dict
+     * - PLACEHOLDER nodes are validated lazily during execution
      */
-    void prepare_graph(const FeedDict& feed_dict);
+    void prepare_graph();
+    
+    /**
+     * @brief Core Kahn's algorithm for topological sorting.
+     * 
+     * Performs BFS-based topological sort on a given set of nodes.
+     * 
+     * @param nodes Set of node IDs to sort
+     * @param in_degree Map of node ID to in-degree count
+     * @param dependents Map of node ID to list of dependent node IDs
+     * @return Vector of nodes in topological order
+     */
+    [[nodiscard]] std::vector<Node*> kahn_algorithm(
+        const std::unordered_set<std::string>& nodes,
+        const std::unordered_map<std::string, int>& in_degree,
+        const std::unordered_map<std::string, std::vector<std::string>>& dependents
+    );
+    
+    /**
+     * @brief Fast depth estimation with early termination.
+     * 
+     * @param node_id Starting node ID
+     * @param max_depth Maximum depth to check (stops early if exceeded)
+     * @return Estimated depth (may be capped at max_depth + 1)
+     */
+    [[nodiscard]] size_t estimate_depth_fast(
+        std::string_view node_id,
+        size_t max_depth
+    ) const;
+    
+    /**
+     * @brief Recursive helper for depth estimation.
+     */
+    [[nodiscard]] size_t estimate_depth_dfs(
+        std::string_view node_id,
+        size_t max_depth,
+        std::unordered_map<std::string, size_t>& memo
+    ) const;
 };
 
 }

@@ -20,7 +20,6 @@ public:
      * 
      * @param json JSON object containing graph definition
      * @return Unique pointer to the constructed Graph
-     * @throws std::runtime_error if JSON is malformed
      */
     static std::unique_ptr<Graph> from_json(const nlohmann::json& json);
 
@@ -29,7 +28,6 @@ public:
      * 
      * @param id Node identifier
      * @return Reference to the node
-     * @throws std::runtime_error if node not found
      */
     Node& get_node(std::string_view id);
 

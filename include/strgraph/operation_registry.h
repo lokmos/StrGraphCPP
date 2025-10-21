@@ -88,7 +88,6 @@ public:
      * 
      * @param name The name of the operation to retrieve
      * @return The StringOperation associated with the given name
-     * @throws std::runtime_error if the operation is not found
      */
     [[nodiscard]] StringOperation get_op(std::string_view name) const;
 

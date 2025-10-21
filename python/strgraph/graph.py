@@ -6,6 +6,25 @@ from typing import Dict, List, Optional, Union
 from . import backend
 
 
+# Global variable to track the active graph for context manager
+_active_graph: Optional['Graph'] = None
+
+
+def get_active_graph() -> 'Graph':
+    """
+    Get the currently active graph (for use in context manager).
+    
+    Returns:
+        The active Graph instance
+        
+    Raises:
+        RuntimeError: If no graph is active
+    """
+    if _active_graph is None:
+        raise RuntimeError("No active graph. Use 'with Graph() as g:' or create Graph explicitly.")
+    return _active_graph
+
+
 class Graph:
     """
     Represents a string computation graph.
@@ -208,6 +227,27 @@ class Graph:
     def __repr__(self) -> str:
         """String representation of the graph."""
         return f"Graph(nodes={len(self._nodes)})"
+    
+    def __enter__(self) -> 'Graph':
+        """
+        Enter the context manager.
+        
+        Returns:
+            self (the Graph instance)
+        """
+        global _active_graph
+        if _active_graph is not None:
+            raise RuntimeError("Cannot nest Graph context managers")
+        _active_graph = self
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the context manager.
+        """
+        global _active_graph
+        _active_graph = None
+        return False
 
 
 class Node:
@@ -262,9 +302,6 @@ class MultiOutputNode(Node):
             
         Returns:
             A Node object representing the indexed output
-            
-        Raises:
-            TypeError: If index is not an integer
         """
         if not isinstance(index, int):
             raise TypeError(f"Index must be an integer, got {type(index).__name__}")

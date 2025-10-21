@@ -28,6 +28,14 @@ PYBIND11_MODULE(strgraph_cpp, m) {
         py::arg("feed_dict")
     );
     
+    m.def("execute_auto",
+        [](const std::string& json_data, const std::unordered_map<std::string, std::string>& feed_dict) {
+            return strgraph::execute_auto(json_data, feed_dict);
+        },
+        py::arg("json_data"),
+        py::arg("feed_dict") = std::unordered_map<std::string, std::string>{}
+    );
+    
     m.def("register_python_operation",
         [](const std::string& name, py::object py_func) {
             auto& registry = strgraph::OperationRegistry::get_instance();
@@ -88,5 +96,5 @@ PYBIND11_MODULE(strgraph_cpp, m) {
         py::arg("func")
     );
     
-    m.attr("__version__") = "0.5.0";
+    m.attr("__version__") = "0.7.0";
 }
