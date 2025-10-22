@@ -497,6 +497,7 @@ sg.register_operation("analyze_text", analyze_text, multi_output=True)
 - **Example**: For 3 outputs, use indices 0, 1, 2
 
 # 3. Use in graph
+```python
 with sg.Graph() as g:
     text_input = g.placeholder(name="text")
     analysis = g._add_operation_node("analyze_text", [text_input.id])
