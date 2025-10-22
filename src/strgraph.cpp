@@ -26,4 +26,20 @@ std::string execute(std::string_view json_data,
     return executor.compute(target_node_id, feed_dict);
 }
 
+std::string execute_auto(std::string_view json_data,
+                        const std::unordered_map<std::string, std::string>& feed_dict) {
+    auto json = nlohmann::json::parse(json_data);
+
+    if (!json.contains("target_node")) {
+        throw std::runtime_error("JSON missing 'target_node' field.");
+    }
+
+    std::string target_node_id = json["target_node"].get<std::string>();
+
+    auto graph = Graph::from_json(json);
+    Executor executor(*graph);
+
+    return executor.compute_auto(target_node_id, feed_dict);
+}
+
 } // namespace strgraph

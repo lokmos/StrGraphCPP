@@ -52,21 +52,6 @@ def execute(graph_json: dict, feed_dict: Optional[Dict[str, str]] = None) -> str
         
     Returns:
         The computed result string from the target node
-        
-    Raises:
-        RuntimeError: If backend is not available
-        RuntimeError: If graph execution fails (forwarded from C++ backend)
-        
-    Example:
-        >>> graph = {
-        ...     "nodes": [
-        ...         {"id": "x", "type": "placeholder"},
-        ...         {"id": "y", "op": "reverse", "inputs": ["x"]}
-        ...     ],
-        ...     "target_node": "y"
-        ... }
-        >>> execute(graph, {"x": "hello"})
-        'olleh'
     """
     if not _backend_available:
         raise RuntimeError(

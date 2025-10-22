@@ -88,9 +88,16 @@ public:
      * 
      * @param name The name of the operation to retrieve
      * @return The StringOperation associated with the given name
-     * @throws std::runtime_error if the operation is not found
      */
     [[nodiscard]] StringOperation get_op(std::string_view name) const;
+    
+    /**
+     * @brief Check if an operation exists.
+     * 
+     * @param name The name of the operation to check
+     * @return True if the operation exists, false otherwise
+     */
+    [[nodiscard]] bool has_operation(std::string_view name) const;
 
     // Delete copy and move operations to enforce singleton
     OperationRegistry(const OperationRegistry&) = delete;
@@ -109,5 +116,35 @@ private:
      */
     std::unordered_map<std::string, StringOperation, StringHash, StringEqual> operations_;
 };
+
+/**
+ * @brief Register user operation macro
+ * 
+ * Users can use this macro to register their custom operations.
+ * 
+ * @param op_name Operation name (string literal)
+ * @param func_name Function name (identifier)
+ */
+#define REGISTER_USER_OP(op_name, func_name) \
+    namespace { \
+        struct func_name##_Registrar { \
+            func_name##_Registrar() { \
+                auto& registry = OperationRegistry::get_instance(); \
+                registry.register_op(op_name, [](std::span<const std::string_view> inputs, std::span<const std::string_view> constants) { \
+                    std::vector<std::string> input_vec; \
+                    for (const auto& sv : inputs) { \
+                        input_vec.emplace_back(sv); \
+                    } \
+                    std::vector<std::string> const_vec; \
+                    for (const auto& sv : constants) { \
+                        const_vec.emplace_back(sv); \
+                    } \
+                    std::string result = func_name(input_vec, const_vec); \
+                    return OpResult(result); \
+                }); \
+            } \
+        }; \
+        static func_name##_Registrar func_name##_instance; \
+    }
 
 }

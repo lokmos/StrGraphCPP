@@ -6,6 +6,25 @@ from typing import Dict, List, Optional, Union
 from . import backend
 
 
+# Global variable to track the active graph for context manager
+_active_graph: Optional['Graph'] = None
+
+
+def get_active_graph() -> 'Graph':
+    """
+    Get the currently active graph (for use in context manager).
+    
+    Returns:
+        The active Graph instance
+        
+    Raises:
+        RuntimeError: If no graph is active
+    """
+    if _active_graph is None:
+        raise RuntimeError("No active graph. Use 'with Graph() as g:' or create Graph explicitly.")
+    return _active_graph
+
+
 class Graph:
     """
     Represents a string computation graph.
@@ -146,7 +165,8 @@ class Graph:
         Returns:
             A Node object representing the operation
         """
-        node_id = self._generate_node_id(name or op_name)
+        # Auto-generate unique ID if name is not provided
+        node_id = self._generate_node_id(name)
         node_dict = {
             "id": node_id,
             "op": op_name,
@@ -189,14 +209,66 @@ class Graph:
         else:
             target_id = target
         
-        # Construct graph JSON
+        # Use optimized execution if available
+        if hasattr(self, '_compiled_graph') and self._compiled_graph is not None:
+            return self._compiled_graph.run(target_id, feed_dict or {})
+        
+        # Fallback to JSON-based execution
         graph_json = {
             "nodes": self._nodes,
             "target_node": target_id
         }
         
-        # Execute using C++ backend
         return backend.execute(graph_json, feed_dict)
+    
+    def run_optimized(
+        self,
+        target: Union['Node', str],
+        feed_dict: Optional[Dict[str, str]] = None
+    ) -> str:
+        """
+        Execute the graph with optimized performance (no JSON overhead).
+        
+        This method uses a compiled graph internally to avoid JSON parsing
+        overhead, providing significant performance improvement for single
+        executions.
+        
+        Args:
+            target: The node to compute. Can be a Node object or a string
+                   node ID (with optional output index like "node:0")
+            feed_dict: Dictionary mapping placeholder node IDs to their
+                      runtime string values. Required if the graph contains
+                      placeholder nodes.
+        
+        Returns:
+            The computed result string from the target node
+        """
+        # Convert target to node ID string
+        if isinstance(target, Node):
+            target_id = target.id
+        else:
+            target_id = target
+        
+        # Create or reuse compiled graph
+        if not hasattr(self, '_compiled_graph') or self._compiled_graph is None:
+            self._compiled_graph = CompiledGraph(self.to_json())
+        
+        if not self._compiled_graph.is_valid():
+            raise RuntimeError("Failed to compile graph for optimized execution")
+        
+        return self._compiled_graph.run(target_id, feed_dict or {})
+    
+    def compile(self) -> 'CompiledGraph':
+        """
+        Compile the graph for efficient repeated execution.
+        
+        This method creates a CompiledGraph that avoids JSON parsing overhead
+        on repeated executions. 
+
+        Returns:
+            A CompiledGraph instance that can be executed efficiently
+        """
+        return CompiledGraph(self.to_json())
     
     def to_json(self) -> dict:
         """
@@ -207,6 +279,56 @@ class Graph:
     def __repr__(self) -> str:
         """String representation of the graph."""
         return f"Graph(nodes={len(self._nodes)})"
+    
+    def __getattr__(self, name):
+        """
+        Dynamic operation discovery for C++ operations.
+        
+        Args:
+            name: The operation name
+            
+        Returns:
+            A function that creates an operation node
+        """
+        # Avoid recursion by checking if we're already in __getattr__
+        if name.startswith('_'):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        
+        # Check if it's a registered C++ operation
+        try:
+            # Import at module level to avoid circular imports
+            import strgraph
+            if hasattr(strgraph, '_cpp_operations') and name in strgraph._cpp_operations:
+                return lambda *args, **kwargs: self._add_operation_node(name, *args, **kwargs)
+        except (ImportError, AttributeError):
+            pass
+        
+        # Check if it's a custom Python operation
+        if hasattr(self, f'_custom_op_{name}'):
+            return lambda *args, **kwargs: self._add_operation_node(name, *args, **kwargs)
+        
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+    
+    def __enter__(self) -> 'Graph':
+        """
+        Enter the context manager.
+        
+        Returns:
+            self (the Graph instance)
+        """
+        global _active_graph
+        if _active_graph is not None:
+            raise RuntimeError("Cannot nest Graph context managers")
+        _active_graph = self
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the context manager.
+        """
+        global _active_graph
+        _active_graph = None
+        return False
 
 
 class Node:
@@ -261,9 +383,6 @@ class MultiOutputNode(Node):
             
         Returns:
             A Node object representing the indexed output
-            
-        Raises:
-            TypeError: If index is not an integer
         """
         if not isinstance(index, int):
             raise TypeError(f"Index must be an integer, got {type(index).__name__}")
@@ -277,4 +396,85 @@ class MultiOutputNode(Node):
     def __repr__(self) -> str:
         """String representation of the multi-output node."""
         return f"MultiOutputNode(id='{self.id}')"
+
+
+class CompiledGraph:
+    """
+    A compiled graph that can be executed efficiently without JSON overhead.
+    
+    This class wraps the C++ CompiledGraph and provides a Python interface
+    for high-performance graph execution. Use Graph.compile() to create instances.
+    """
+    
+    def __init__(self, graph_json: dict):
+        """
+        Create a compiled graph from a graph JSON dictionary.
+        
+        Args:
+            graph_json: Graph definition dictionary
+        """
+        import json
+        json_str = json.dumps(graph_json)
+        self._compiled = backend.strgraph_cpp.CompiledGraph(json_str)
+    
+    def run(self, target: Union[Node, str], feed_dict: Optional[Dict[str, str]] = None) -> str:
+        """
+        Execute the compiled graph and return the result.
+        
+        Args:
+            target: The node to compute. Can be a Node object or a string
+                   node ID (with optional output index like "node:0")
+            feed_dict: Dictionary mapping placeholder node IDs to their
+                      runtime string values. Required if the graph contains
+                      placeholder nodes.
+        
+        Returns:
+            The computed result string from the target node
+        """
+        # Convert target to node ID string
+        if isinstance(target, Node):
+            target_id = target.id
+        else:
+            target_id = target
+        
+        if feed_dict is None:
+            feed_dict = {}
+        
+        return self._compiled.run(target_id, feed_dict)
+    
+    def run_auto(self, target: Union[Node, str], feed_dict: Optional[Dict[str, str]] = None) -> str:
+        """
+        Execute with auto strategy selection.
+        
+        Args:
+            target: The node to compute
+            feed_dict: Runtime values for PLACEHOLDER nodes
+        
+        Returns:
+            The computed result string
+        """
+        # Convert target to node ID string
+        if isinstance(target, Node):
+            target_id = target.id
+        else:
+            target_id = target
+        
+        if feed_dict is None:
+            feed_dict = {}
+        
+        return self._compiled.run_auto(target_id, feed_dict)
+    
+    def is_valid(self) -> bool:
+        """
+        Check if the compiled graph is valid and ready for execution.
+        
+        Returns:
+            True if the graph is valid, False otherwise
+        """
+        return self._compiled.is_valid()
+    
+    def __repr__(self) -> str:
+        """String representation of the compiled graph."""
+        status = "valid" if self.is_valid() else "invalid"
+        return f"CompiledGraph(status={status})"
 

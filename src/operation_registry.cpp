@@ -23,4 +23,8 @@ StringOperation OperationRegistry::get_op(std::string_view name) const {
     return it->second;
 }
 
+bool OperationRegistry::has_operation(std::string_view name) const {
+    return operations_.find(name) != operations_.end();
+}
+
 }

@@ -41,10 +41,6 @@ def register_operation(
         replace: If True, allows replacing an existing operation with
                 the same name. If False (default), raises error if name
                 already exists.
-                
-    Raises:
-        ValueError: If operation name already exists and replace=False
-        TypeError: If func is not callable
     """
     if not callable(func):
         raise TypeError(f"Operation function must be callable, got {type(func)}")
@@ -110,7 +106,8 @@ def list_custom_operations() -> List[str]:
 
 def custom_op(
     op_name: str,
-    *nodes: Node,
+    nodes: Union[List[Node], Node],
+    *extra_nodes: Node,
     constants: Optional[List[str]] = None,
     name: Optional[str] = None
 ) -> Union[Node, MultiOutputNode]:
@@ -122,23 +119,26 @@ def custom_op(
     
     Args:
         op_name: Name of the registered custom operation
-        *nodes: Input nodes for the operation
+        nodes: Either a list of nodes or a single node
+        *extra_nodes: Additional nodes if second arg is not a list
         constants: Optional list of constant string parameters
         name: Optional name for the created node
         
     Returns:
         A new Node representing the operation result
-        
-    Raises:
-        ValueError: If the operation is not registered
-        ValueError: If no input nodes are provided
     
     Note:
         Custom operations are automatically registered with the C++ backend.
         When the graph is executed, the C++ engine will call back to Python
         to execute custom function. 
     """
-    if not nodes:
+    # Handle both list and individual args
+    if isinstance(nodes, list):
+        node_list = nodes
+    else:
+        node_list = [nodes] + list(extra_nodes)
+    
+    if not node_list:
         raise ValueError(f"custom_op '{op_name}' requires at least one input node")
     
     if op_name not in _custom_operations:
@@ -151,10 +151,10 @@ def custom_op(
     func, is_multi_output = _custom_operations[op_name]
     
     # All nodes should belong to the same graph
-    graph = nodes[0].graph
+    graph = node_list[0].graph
     
     # Collect input IDs
-    input_ids = [node.id for node in nodes]
+    input_ids = [node.id for node in node_list]
     
     result_node = graph._add_operation_node(
         op_name=op_name,
