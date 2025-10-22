@@ -28,6 +28,9 @@ set(SOURCES
     src/graph.cpp
     src/executor.cpp
     src/strgraph.cpp
+    src/compiled_graph.cpp
+    src/cpp_operation_interface.cpp
+    user_operations.cpp
 )
 
 # Create library
@@ -55,13 +58,49 @@ target_link_libraries(strgraph_test
     pthread
 )
 
-# Benchmark executable
-add_executable(strgraph_benchmark tests/benchmark.cpp)
-target_link_libraries(strgraph_benchmark strgraph)
+# Benchmark executable (if exists)
+if(EXISTS "${CMAKE_SOURCE_DIR}/tests/benchmark.cpp")
+    add_executable(strgraph_benchmark tests/benchmark.cpp)
+    target_link_libraries(strgraph_benchmark strgraph)
+endif()
+
+# Performance analysis executable (if exists)
+if(EXISTS "${CMAKE_SOURCE_DIR}/tests/benchmark_analysis.cpp")
+    add_executable(strgraph_analysis tests/benchmark_analysis.cpp)
+    target_link_libraries(strgraph_analysis strgraph)
+endif()
 
 # Enable testing
 enable_testing()
 add_test(NAME strgraph_test COMMAND strgraph_test)
+
+# Add custom test targets
+add_custom_target(test_cpp
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/strgraph_test
+    DEPENDS strgraph_test
+    COMMENT "Running C++ tests"
+)
+
+add_custom_target(test_python
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_python_full.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running Python tests"
+)
+
+add_custom_target(test_example
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/examples/complete_workflow.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running complete workflow example"
+)
+
+# Combined test target
+add_custom_target(test_all
+    COMMAND ${CMAKE_MAKE_PROGRAM} test_cpp
+    COMMAND ${CMAKE_MAKE_PROGRAM} test_python
+    COMMAND ${CMAKE_MAKE_PROGRAM} test_example
+    DEPENDS strgraph_test
+    COMMENT "Running all tests (C++, Python, and example)"
+)
 
 # Print configuration
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")

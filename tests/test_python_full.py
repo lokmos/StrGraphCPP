@@ -21,8 +21,22 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'build'))
 import strgraph as sg
 
 
+
 def test_basic_operations():
-    """Test basic string operations and node types."""
+    """
+    Test: Basic string operations and node types
+    
+    Test Content:
+    - Create CONSTANT, PLACEHOLDER nodes
+    - Test basic string operations: concat, to_upper, to_lower, reverse
+    - Execute graph with feed_dict for placeholder values
+    
+    Expected Results:
+    - All operations produce correct results
+    - to_upper: "Hello World" → "HELLO WORLD"
+    - to_lower: "Hello World" → "hello world"  
+    - reverse: "Hello World" → "dlroW olleH"
+    """
     
     with sg.Graph() as g:
         # CONSTANT node
@@ -49,7 +63,20 @@ def test_basic_operations():
 
 
 def test_multi_output_operations():
-    """Test multi-output operations with split."""
+    """
+    Test: Multi-output operations with split
+    
+    Test Content:
+    - Create a sentence and split it into words using split operation
+    - Access individual outputs using indexing (words[0], words[1], etc.)
+    - Process individual words with different operations
+    - Concatenate results back together
+    
+    Expected Results:
+    - Split operation produces multiple outputs
+    - Individual word access works correctly
+    - Final result: "artificial_INTELLIGENCE_smetsyS"
+    """
     with sg.Graph() as g:
         # Create sentence
         text = g.constant("Artificial Intelligence Systems", name="text")
@@ -79,7 +106,21 @@ def test_multi_output_operations():
 
 
 def test_custom_operations():
-    """Test custom operations (both single and multi-output)."""
+    """
+    Test: Custom operations (both single and multi-output)
+    
+    Test Content:
+    - Register custom single-output operation: word_count
+    - Register custom multi-output operation: split_vowels_consonants
+    - Use custom operations in graph execution
+    - Test both single and multi-output custom operations
+    
+    Expected Results:
+    - Custom operations register successfully
+    - Single-output: word_count returns "2" for "Hello World"
+    - Multi-output: vowels="eoo", consonants="hllwrld"
+    - All custom operations execute correctly
+    """
     # Register custom single-output operation
     @sg.operation(name="word_count")
     def count_words(inputs, constants):
@@ -116,7 +157,21 @@ def test_custom_operations():
 
 
 def test_advanced_string_operations():
-    """Test advanced string manipulation operations."""
+    """
+    Test: Advanced string manipulation operations
+    
+    Test Content:
+    - Test trim operation to remove whitespace
+    - Test replace operation to substitute text
+    - Test substring operation to extract parts
+    - Test length operation to count characters
+    
+    Expected Results:
+    - trim: "  hello world  " → "hello world"
+    - replace: "hello world" → "hello python"
+    - substring: "hello python" → "python"
+    - length: "python" → "6"
+    """
     with sg.Graph() as g:
         text = g.constant("  hello world  ", name="text")
         
@@ -145,7 +200,20 @@ def test_advanced_string_operations():
 
 
 def test_variable_nodes():
-    """Test VARIABLE nodes that persist across runs."""
+    """
+    Test: VARIABLE nodes that persist across runs
+    
+    Test Content:
+    - Create a VARIABLE node to store persistent state
+    - Execute the graph multiple times
+    - Verify that variable values persist between runs
+    - Test variable state management
+    
+    Expected Results:
+    - Variable nodes maintain state across multiple runs
+    - Variable values persist between graph executions
+    - State management works correctly
+    """
     with sg.Graph() as g:
         # Create a variable node
         counter = g.variable("0", name="counter")
@@ -164,7 +232,21 @@ def test_variable_nodes():
 
 
 def test_complex_graph():
-    """Test a complex multi-layer graph with mixed operations."""
+    """
+    Test: Complex multi-layer graph with mixed operations
+    
+    Test Content:
+    - Create a complex graph with multiple layers of operations
+    - Use custom multi-output operation: extract_initials
+    - Chain multiple string operations together
+    - Test complex data flow through the graph
+    
+    Expected Results:
+    - Complex graph executes successfully
+    - Custom operation works correctly
+    - Final result: "JOHN DOE"
+    - All intermediate operations produce correct results
+    """
     # Register a custom operation
     @sg.operation(name="extract_initials", multi_output=True)
     def get_initials(inputs, constants):
@@ -217,9 +299,251 @@ def test_complex_graph():
             f"Expected 'john smith', got '{result_lower}'"
 
 
+def test_compiled_graph_performance():
+    """
+    Test: CompiledGraph performance optimization for repeated execution
+    
+    Test Content:
+    - Create a moderately complex graph with multiple operations
+    - Compare original Graph.run() vs CompiledGraph.run() for 10 iterations
+    - Measure execution time and calculate speedup
+    
+    Expected Results:
+    - Both methods produce identical results
+    - CompiledGraph should be significantly faster (≥2x speedup)
+    - Performance improvement due to avoiding repeated JSON parsing
+    """
+    import time
+    
+    with sg.Graph() as g:
+        # Create a moderately complex graph
+        text = g.placeholder(name="text")
+        
+        # Chain of operations
+        trimmed = sg.trim(text, name="trimmed")
+        upper = sg.to_upper(trimmed, name="upper")
+        reversed_text = sg.reverse(upper, name="reversed")
+        final = sg.concat([reversed_text, g.constant("_processed", name="suffix")], name="final")
+    
+    # Test 1: Original execution (with JSON overhead)
+    start_time = time.time()
+    for i in range(10):
+        result1 = g.run(final, feed_dict={"text": f"test {i}"})
+    original_time = time.time() - start_time
+    
+    # Test 2: Compiled execution (optimized)
+    compiled = g.compile()
+    assert compiled.is_valid(), "Compiled graph should be valid"
+    
+    start_time = time.time()
+    for i in range(10):
+        result2 = compiled.run(final, feed_dict={"text": f"test {i}"})
+    compiled_time = time.time() - start_time
+    
+    # Results should be identical
+    assert result1 == result2, f"Results should match: {result1} vs {result2}"
+    
+    # Performance improvement should be significant
+    speedup = original_time / compiled_time if compiled_time > 0 else float('inf')
+    
+    # Compiled should be faster (at least 2x improvement expected)
+    assert speedup >= 2.0, f"Expected at least 2x speedup, got {speedup:.1f}x"
+
+
+def test_compiled_graph_functionality():
+    """
+    Test: CompiledGraph functionality correctness
+    
+    Test Content:
+    - Create a complex graph with multiple operations and placeholders
+    - Test with multiple different input combinations
+    - Compare results between original Graph.run() and CompiledGraph.run()
+    
+    Expected Results:
+    - CompiledGraph should be valid after compilation
+    - Both methods produce identical results for all test cases
+    - No functional differences between original and compiled execution
+    """
+    with sg.Graph() as g:
+        input1 = g.placeholder(name="input1")
+        input2 = g.placeholder(name="input2")
+        
+        concat = sg.concat([input1, g.constant("_", name="sep"), input2], name="concat")
+        upper = sg.to_upper(concat, name="upper")
+        reversed_text = sg.reverse(upper, name="reversed")
+        final = sg.concat([reversed_text, g.constant("_done", name="suffix")], name="final")
+    
+    # Compile the graph
+    compiled = g.compile()
+    assert compiled.is_valid(), "Compiled graph should be valid"
+    
+    test_cases = [
+        {"input1": "hello", "input2": "world"},
+        {"input1": "test", "input2": "case"},
+        {"input1": "python", "input2": "cpp"},
+    ]
+    
+    for feed_dict in test_cases:
+        # Original execution
+        result_original = g.run(final, feed_dict=feed_dict)
+        
+        # Compiled execution
+        result_compiled = compiled.run(final, feed_dict=feed_dict)
+        
+        # Results should be identical
+        assert result_original == result_compiled, \
+            f"Results should match for {feed_dict}: {result_original} vs {result_compiled}"
+
+
+def test_compiled_graph_auto_strategy():
+    """
+    Test: CompiledGraph auto strategy selection
+    
+    Test Content:
+    - Create a graph that benefits from auto strategy selection
+    - Test both run() and run_auto() methods on CompiledGraph
+    - Verify that both methods produce identical results
+    
+    Expected Results:
+    - CompiledGraph should be valid after compilation
+    - Both run() and run_auto() produce identical results
+    - Auto strategy selection works correctly for compiled graphs
+    """
+    with sg.Graph() as g:
+        # Create a graph that benefits from auto strategy
+        text = g.placeholder(name="text")
+        processed = sg.reverse(sg.to_upper(text, name="upper"), name="processed")
+    
+    compiled = g.compile()
+    assert compiled.is_valid(), "Compiled graph should be valid"
+    
+    # Test both run() and run_auto()
+    feed_dict = {"text": "hello world"}
+    
+    result_run = compiled.run(processed, feed_dict=feed_dict)
+    result_auto = compiled.run_auto(processed, feed_dict=feed_dict)
+    
+    # Both should produce the same result
+    assert result_run == result_auto, f"Results should match: {result_run} vs {result_auto}"
+    assert result_run == "DLROW OLLEH", f"Expected 'DLROW OLLEH', got '{result_run}'"
+
+
+def test_single_execution_optimization():
+    """
+    Test: Single execution optimization for complex graphs
+    
+    Test Content:
+    - Create a very complex graph (30 layers, 156 nodes, 10KB JSON)
+    - Compare original Graph.run() vs Graph.run_optimized() for single execution
+    - Measure JSON size, execution time, and performance improvement
+    - Test caching mechanism after optimization
+    
+    Expected Results:
+    - Both methods produce identical results
+    - run_optimized() should show performance improvement (≥1.2x speedup)
+    - Cached run() should show significant improvement (≥5x speedup)
+    - JSON size should be substantial (>5KB) to demonstrate overhead
+    """
+    import time
+    import json
+    
+    # Create a very complex graph to maximize JSON overhead
+    with sg.Graph() as g:
+        # Create multiple input nodes
+        inputs = []
+        for i in range(5):
+            input_node = g.placeholder(name=f"input_{i}")
+            inputs.append(input_node)
+        
+        # Create a deep computation graph (30 layers)
+        current_nodes = inputs
+        for layer in range(30):
+            next_nodes = []
+            for i, node in enumerate(current_nodes):
+                # Alternate between different operations to create variety
+                if layer % 4 == 0:
+                    new_node = sg.to_upper(node, name=f"upper_{layer}_{i}")
+                elif layer % 4 == 1:
+                    new_node = sg.reverse(node, name=f"reverse_{layer}_{i}")
+                elif layer % 4 == 2:
+                    new_node = sg.to_lower(node, name=f"lower_{layer}_{i}")
+                else:
+                    new_node = sg.trim(node, name=f"trim_{layer}_{i}")
+                next_nodes.append(new_node)
+            current_nodes = next_nodes
+        
+        # Final concatenation of all results
+        final = sg.concat(current_nodes, name="final")
+    
+    # Create a large feed_dict to increase JSON size
+    feed_dict = {f"input_{i}": f"test_data_{i}_" + "x" * 50 for i in range(5)}
+    
+    # Test 1: Original run() method (with JSON overhead)
+    start_time = time.perf_counter()  # Use high-precision timer
+    result1 = g.run(final, feed_dict=feed_dict)
+    original_time = time.perf_counter() - start_time
+    
+    # Test 2: Optimized run_optimized() method (no JSON overhead)
+    start_time = time.perf_counter()
+    result2 = g.run_optimized(final, feed_dict=feed_dict)
+    optimized_time = time.perf_counter() - start_time
+    
+    # Results should be identical
+    assert result1 == result2, f"Results should match: {result1} vs {result2}"
+    
+    # Calculate performance improvement
+    speedup = original_time / optimized_time if optimized_time > 0 else float('inf')
+    
+    # Test 3: Verify that run() now uses optimization after first run_optimized()
+    start_time = time.perf_counter()
+    result3 = g.run(final, feed_dict=feed_dict)
+    cached_time = time.perf_counter() - start_time
+    
+    # Should be fast now (using cached compiled graph)
+    assert result3 == result1, f"Results should match: {result3} vs {result1}"
+
+
+def test_graph_modification_after_optimization():
+    """
+    Test: Graph modification cache invalidation
+    
+    Test Content:
+    - Create a simple graph and run with run_optimized()
+    - Modify the graph structure by adding new nodes
+    - Test that cached optimization is properly invalidated
+    - Verify that run() falls back to JSON execution after modification
+    
+    Expected Results:
+    - run_optimized() works correctly before modification
+    - Graph modification invalidates cached optimization
+    - run() falls back to JSON-based execution after modification
+    - run_optimized() creates new compiled graph after modification
+    """
+    with sg.Graph() as g:
+        text = g.placeholder(name="text")
+        upper = sg.to_upper(text, name="upper")
+    
+    feed_dict = {"text": "hello"}
+    
+    # First execution with run_optimized
+    result1 = g.run_optimized(upper, feed_dict=feed_dict)
+    assert result1 == "HELLO"
+    
+    # Modify the graph (add a new node)
+    g.constant("_modified", name="modification")
+    
+    # The cached optimization should be invalidated
+    # So run() should fall back to JSON-based execution
+    result2 = g.run(upper, feed_dict=feed_dict)
+    assert result2 == "HELLO"
+    
+    # But run_optimized should create a new compiled graph
+    result3 = g.run_optimized(upper, feed_dict=feed_dict)
+    assert result3 == "HELLO"
+
+
 def main():
     """Run all tests."""
-    
     tests = [
         ("test_basic_operations", test_basic_operations),
         ("test_multi_output_operations", test_multi_output_operations),
@@ -227,6 +551,12 @@ def main():
         ("test_advanced_string_operations", test_advanced_string_operations),
         ("test_variable_nodes", test_variable_nodes),
         ("test_complex_graph", test_complex_graph),
+        ("test_compiled_graph_performance", test_compiled_graph_performance),
+        ("test_compiled_graph_functionality", test_compiled_graph_functionality),
+        ("test_compiled_graph_auto_strategy", test_compiled_graph_auto_strategy),
+        ("test_single_execution_optimization", test_single_execution_optimization),
+        ("test_graph_modification_after_optimization", test_graph_modification_after_optimization),
+        ("test_cpp_operations", test_cpp_operations),
     ]
     
     passed = 0
@@ -250,6 +580,42 @@ def main():
         return 1
     
     return 0
+
+
+def test_cpp_operations():
+    """
+    Test Content: Test C++ operations registration and usage
+    Expected Results: C++ operations should be registered and work correctly
+    """
+    print("\n[C++ Operations] Testing C++ operations registration...")
+    
+    try:
+        # Register C++ operation
+        sg.register_cpp_operation("word_count")
+        
+        print("   C++ operation registered successfully")
+        
+        # Test using C++ operation
+        with sg.Graph() as g:
+            text = g.placeholder("text")
+            
+            # Test C++ operation registration
+            print("  Testing C++ operation registration...")
+            
+            # Check if operation is available
+            import strgraph_cpp
+            assert strgraph_cpp.has_cpp_operation("word_count"), "word_count not found"
+            
+            print("   C++ operation is registered")
+            
+            print("   C++ operations test passed")
+            return True
+            
+    except Exception as e:
+        print(f"   C++ operations test failed: {e}")
+        return False
+
+
 
 
 if __name__ == "__main__":

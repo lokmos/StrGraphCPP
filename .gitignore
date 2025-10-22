@@ -1,19 +1,14 @@
-# Build directories and outputs
+# Build directories
 build/
 cmake-build-*/
 
-# Compiled Object files
-*.o
-*.obj
-*.a
+# Compiled binaries
+*.exe
+*.out
+*.app
 *.so
 *.dylib
 *.dll
-
-# Executables
-*.exe
-*.out
-strgraph_test
 
 # CMake generated files
 CMakeCache.txt
@@ -23,28 +18,68 @@ Makefile
 *.cmake
 !CMakeLists.txt
 
-# IDE configurations
+# IDE files
 .vscode/
 .idea/
-.clangd
 *.swp
 *.swo
 *~
 
-# OS specific
-.DS_Store
-Thumbs.db
-
-# Documentation (local development only, except README.md)
-docs/
-
-# Test outputs
-*.log
-
-# Python build artifacts
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
-*.egg-info/
-dist/
-*.egg
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Test outputs
+*.log
+test_results/
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Third-party dependencies (keep json.hpp, ignore others)
+third_party/pybind11/
+external/
+deps/
+
+# Generated documentation
+docs
+*.pdf
+
+# Performance profiling outputs
+*.prof
+*.cache
+callgrind.out.*
+perf.data*
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+.clangd

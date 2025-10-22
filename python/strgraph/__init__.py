@@ -12,7 +12,7 @@ The library is organized into several modules:
 """
 
 # Core classes
-from .graph import Graph, Node, MultiOutputNode
+from .graph import Graph, Node, MultiOutputNode, CompiledGraph
 
 # Operations
 from .ops import (
@@ -43,8 +43,47 @@ from .custom_ops import (
     list_custom_operations,
 )
 
+# Hybrid operations (Python + C++ dynamic linking)
+from .hybrid_ops import (
+    register_python_operation,
+    register_cpp_operation,
+    load_cpp_library,
+    get_operation,
+    list_operations,
+    remove_operation,
+    clear_operations,
+    unload_library,
+    python_op,
+    cpp_op,
+)
+
 # Backend utilities
 from .backend import is_backend_available
+
+# C++ operation registration
+def register_cpp_operation(name):
+    """
+    Register a C++ operation for direct use in graphs.
+    
+    Args:
+        name: The name of the C++ operation (must match the name in user_operations.cpp)
+        
+    Raises:
+        ValueError: If the C++ operation is not found
+    """
+    if not is_backend_available():
+        raise RuntimeError("C++ backend not available")
+    
+    # Check if C++ operation exists
+    import strgraph_cpp
+    if not strgraph_cpp.has_cpp_operation(name):
+        raise ValueError(f"C++ operation '{name}' not found. Make sure it's defined in user_operations.cpp")
+    
+    # Register the operation for use in graphs
+    _cpp_operations.add(name)
+
+# Set to store registered C++ operations
+_cpp_operations = set()
 
 # Version info
 __version__ = "0.7.0"
@@ -55,6 +94,7 @@ __all__ = [
     "Graph",
     "Node",
     "MultiOutputNode",
+    "CompiledGraph",
     
     # Basic operations
     "reverse",
@@ -81,8 +121,21 @@ __all__ = [
     "is_custom_operation",
     "list_custom_operations",
     
+    # Hybrid operations
+    "register_python_operation",
+    "register_cpp_operation",
+    "load_cpp_library",
+    "get_operation",
+    "list_operations",
+    "remove_operation",
+    "clear_operations",
+    "unload_library",
+    "python_op",
+    "cpp_op",
+    
     # Utilities
     "is_backend_available",
+    "register_cpp_operation",
     
     # Version
     "__version__",
